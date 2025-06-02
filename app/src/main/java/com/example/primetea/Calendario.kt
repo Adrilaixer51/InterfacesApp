@@ -1,5 +1,6 @@
 package com.example.primetea
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,9 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.chargemap.compose.numberpicker.NumberPicker
-import java.time.*
+import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.TextStyle
-import java.util.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,35 +43,50 @@ fun CalendarioScreen(navController: NavController) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
         Spacer(modifier = Modifier.height(16.dp))
-        // Logo
-        androidx.compose.foundation.Image(
-            painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Logo",
-            modifier = Modifier
-                .size(120.dp)
-                .padding(bottom = 16.dp)
-        )
 
-        Spacer(Modifier.height(8.dp))
-        Image(
-            painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Logo",
-            modifier = Modifier.size(100.dp)
-        )
-        Spacer(Modifier.height(8.dp))
+        // ── BOX SUPERIOR: flecha atrás alineada a la izquierda y logo centrado ──
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+                .height(64.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Icono de flecha atrás alineado a la izquierda
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "Volver a Home",
+                tint = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(32.dp)
+                    .clickable { navController.navigate("home") }
+            )
+
+            // Logo centrado
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                modifier = Modifier
+                    .size(100.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
             "Calendario",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF2E7D32)
+            color = Color(0xFF2E7D32),
+            modifier = Modifier.padding(bottom = 16.dp)
         )
-        Spacer(Modifier.height(16.dp))
 
+        // Navegación de mes
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton({ currentMonth = currentMonth.minusMonths(1) }) {
-                Icon(Icons.Default.ArrowBack, "")
+            IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = "Mes anterior")
             }
             Text(
                 text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + currentMonth.year,
@@ -79,23 +96,25 @@ fun CalendarioScreen(navController: NavController) {
                 color = Color.Black,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
-            IconButton({ currentMonth = currentMonth.plusMonths(1) }) {
-                Icon(Icons.Default.ArrowForward, "")
+            IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
+                Icon(Icons.Filled.ArrowForward, contentDescription = "Mes siguiente")
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
+        // Días de la semana
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             listOf("L", "M", "X", "J", "V", "S", "D").forEach {
                 Text(it, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
             }
         }
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
+        // Construye la cuadrícula del mes
         val firstDayOfMonth = currentMonth.atDay(1)
-        val startDow = firstDayOfMonth.dayOfWeek.value % 7
+        val startDow = firstDayOfMonth.dayOfWeek.value % 7  // lunes=1->1,...domingo=7->0
         val totalDays = currentMonth.lengthOfMonth()
         val weeks = ((startDow + totalDays + 6) / 7)
 
@@ -209,9 +228,6 @@ fun CalendarioScreen(navController: NavController) {
         }
     }
 }
-
-@Composable
-fun <Painter> Image(painter: Painter, contentDescription: String, modifier: Modifier) {}
 
 @Composable
 fun SegmentedButtonGroup(

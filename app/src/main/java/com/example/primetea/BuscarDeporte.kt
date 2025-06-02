@@ -17,9 +17,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sports
+import androidx.compose.material.icons.filled.SportsBasketball
+import androidx.compose.material.icons.filled.SportsMartialArts
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.SportsTennis
+import androidx.compose.material.icons.rounded.DirectionsBike
+import androidx.compose.material.icons.rounded.Pool
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +53,8 @@ fun BuscarDeporteScreen(
     viewModel: FavoritosViewModel = viewModel()
 ) {
     var textoBusqueda by remember { mutableStateOf("") }
+
+    // Lista completa de deportes
     val deportes = listOf("Fútbol", "Baloncesto", "Natación", "Tenis", "Karate", "Ciclismo")
     val favoritos = viewModel.favoritos
 
@@ -55,16 +66,47 @@ fun BuscarDeporteScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(16.dp))
-        // Logo
-        Image(
-            painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Logo",
-            modifier = Modifier
-                .size(120.dp)
-                .padding(bottom = 16.dp)
-        )
 
-        // Título
+        // ── BOX SUPERIOR: flecha atrás, logo centrado y botón de ayuda a la derecha ──
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+                .height(64.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Icono de flecha atrás alineado a la izquierda
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "Volver a Home",
+                tint = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(32.dp)
+                    .clickable { navController.navigate("home") }
+            )
+
+            // Logo en el centro
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                modifier = Modifier
+                    .size(100.dp)
+            )
+
+            // Icono de ayuda alineado a la derecha
+            Icon(
+                imageVector = Icons.Filled.Help,
+                contentDescription = "Ayuda",
+                tint = Color(0xFF2E7D32),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .size(32.dp)
+                    .clickable { navController.navigate("duda1") }
+            )
+        }
+
+        // ── TÍTULO ──
         Text(
             "Buscar Deporte",
             fontSize = 28.sp,
@@ -73,7 +115,7 @@ fun BuscarDeporteScreen(
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
-        // Campo de búsqueda
+        // ── CAMPO DE BÚSQUEDA ──
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,7 +138,7 @@ fun BuscarDeporteScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        // Lista filtrada
+        // ── LISTA FILTRADA ──
         val filtrados = deportes.filter {
             it.contains(textoBusqueda, ignoreCase = true)
         }
@@ -120,23 +162,48 @@ fun BotonDeporte(
     esFavorito: Boolean,
     onFavoritoClick: () -> Unit
 ) {
+    // Selecciona el icono Material más adecuado según el deporte
+    val iconoDeporte = when (nombre) {
+        "Fútbol" -> Icons.Filled.SportsSoccer
+        "Baloncesto" -> Icons.Filled.SportsBasketball
+        "Natación" -> Icons.Rounded.Pool
+        "Tenis" -> Icons.Filled.SportsTennis
+        "Karate" -> Icons.Filled.SportsMartialArts
+        "Ciclismo" -> Icons.Rounded.DirectionsBike
+        else -> Icons.Filled.Sports
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(70.dp)
             .background(Color.White, shape = RoundedCornerShape(16.dp))
             .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Icono del deporte a la izquierda
+        Icon(
+            imageVector = iconoDeporte,
+            contentDescription = "$nombre icono",
+            tint = Color(0xFF2E7D32),
+            modifier = Modifier
+                .size(36.dp)
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Nombre del deporte
         Text(
             nombre,
             fontSize = 20.sp,
-            color = Color.Black
+            color = Color.Black,
+            modifier = Modifier.weight(1f)
         )
+
+        // Corazón de favorito a la derecha
         Icon(
             imageVector = if (esFavorito) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-            contentDescription = null,
+            contentDescription = if (esFavorito) "Eliminar favorito" else "Agregar favorito",
             tint = if (esFavorito) Color(0xFFFFD700) else Color.Gray,
             modifier = Modifier
                 .size(28.dp)

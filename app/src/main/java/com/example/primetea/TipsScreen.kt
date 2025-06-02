@@ -2,7 +2,9 @@ package com.example.primetea
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -45,14 +48,34 @@ fun TipsScreen(navController: NavController) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(16.dp))
-        // Logo centrado arriba
-        Image(
-            painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Logo",
+
+        // ── BOX SUPERIOR: flecha atrás alineada a la izquierda y logo centrado ──
+        Box(
             modifier = Modifier
-                .size(120.dp)
-                .padding(bottom = 16.dp)
-        )
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+                .height(64.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Icono de flecha atrás alineado a la izquierda
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "Volver a Home",
+                tint = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(32.dp)
+                    .clickable { navController.navigate("home") }
+            )
+
+            // Logo centrado
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                modifier = Modifier
+                    .size(100.dp)
+            )
+        }
 
         // Título
         Text(

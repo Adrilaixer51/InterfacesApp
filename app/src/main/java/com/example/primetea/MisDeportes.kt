@@ -1,9 +1,11 @@
 package com.example.primetea
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,8 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,9 +31,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 
 @Composable
-fun MisDeportesScreen(favoritosViewModel: FavoritosViewModel) {
+fun MisDeportesScreen(favoritosViewModel: FavoritosViewModel, navController: NavController) {
     val favoritos = favoritosViewModel.favoritos
 
     // Descripciones adaptadas
@@ -49,14 +55,34 @@ fun MisDeportesScreen(favoritosViewModel: FavoritosViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(16.dp))
-        // Logo más grande
-        androidx.compose.foundation.Image(
-            painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Logo",
+
+        // ── BOX SUPERIOR: flecha atrás alineada a la izquierda y logo centrado ──
+        Box(
             modifier = Modifier
-                .size(160.dp)
-                .padding(bottom = 16.dp)
-        )
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+                .height(64.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Icono de flecha atrás alineado a la izquierda
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "Volver a Home",
+                tint = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(32.dp)
+                    .clickable { navController.navigate("home") }
+            )
+
+            // Logo centrado
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                modifier = Modifier
+                    .size(100.dp)
+            )
+        }
 
         Text(
             "Mis Deportes",

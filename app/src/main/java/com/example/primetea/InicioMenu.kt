@@ -49,8 +49,11 @@ class MainActivity : ComponentActivity() {
                     composable("calendario") { CalendarioScreen(navController) }
                     composable("configuracion") { ConfiguracionScreen(navController) }
                     composable("configuracion2") { Configuracion2Screen(navController) }
-                    composable("misDeportes") { MisDeportesScreen(favVM) }
+                    composable("misDeportes") { MisDeportesScreen(favVM, navController) }
                     composable("configuracion3") { Configuracion3Screen(navController) }
+                    composable("Duda1") { Duda1Screen(navController) }
+                    composable("contactoTrue") { ContactoTrueScreen(navController) }
+                    composable("contactoFalse") { ContactoFalseScreen(navController) }
                 }
             }
         }
