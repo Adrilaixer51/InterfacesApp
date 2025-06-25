@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
                     composable("registro") { Registro(navController) }
                     composable("home") { PantallaHome(navController) }
                     composable("buscarDeporte") { BuscarDeporteScreen(navController, favVM) }
-                    composable("tips") { TipsScreen(navController) }
+                    composable("pictos") { PictogramBuilderScreen(navController) }
                     composable("calendario") { CalendarioScreen(navController) }
                     composable("configuracion") { ConfiguracionScreen(navController) }
                     composable("configuracion2") { Configuracion2Screen(navController) }

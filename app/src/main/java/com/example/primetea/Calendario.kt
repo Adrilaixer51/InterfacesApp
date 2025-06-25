@@ -1,5 +1,13 @@
 package com.example.primetea
 
+import android.Manifest
+import android.app.Application
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,246 +18,273 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.room.*
 import com.chargemap.compose.numberpicker.NumberPicker
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
-import java.util.Locale
+import java.util.*
+
+@Entity(tableName = "eventos")
+data class EventEntity(
+    @PrimaryKey val fecha: LocalDate,
+    val hora24: Int,
+    val minuto: Int,
+    val texto: String
+)
+
+@Dao
+interface EventDao {
+    @Query("SELECT * FROM eventos") fun flowAll(): Flow<List<EventEntity>>
+    @Query("SELECT * FROM eventos WHERE fecha = :dia") suspend fun get(dia: LocalDate): EventEntity?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(ev: EventEntity)
+    @Query("DELETE FROM eventos WHERE fecha = :dia") suspend fun delete(dia: LocalDate)
+}
+
+class Converters {
+    @TypeConverter fun dateToString(d: LocalDate) = d.toString()
+    @TypeConverter fun stringToDate(s: String) = LocalDate.parse(s)
+}
+
+@Database(entities = [EventEntity::class], version = 1)
+@TypeConverters(Converters::class)
+abstract class AppDb : RoomDatabase() { abstract fun dao(): EventDao }
+
+class CalendarVm(app: Application) : AndroidViewModel(app) {
+    private val dao = Room.databaseBuilder(app, AppDb::class.java, "db").build().dao()
+    val eventos = dao.flowAll().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    suspend fun save(ev: EventEntity) {
+        dao.upsert(ev)
+        NotiUtils.programar(getApplication(), ev)
+    }
+    suspend fun delete(dia: LocalDate) { dao.delete(dia) }
+    suspend fun get(dia: LocalDate) = dao.get(dia)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarioScreen(navController: NavController) {
+fun CalendarioScreen(navController: NavController, vm: CalendarVm = viewModel()) {
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) { NotiUtils.crearCanal(ctx) }
+
+    val permisoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted)
+            Toast.makeText(ctx, "Sin permiso, no habrá notificaciones", Toast.LENGTH_SHORT).show()
+    }
+
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    val citas = remember { mutableStateListOf<LocalDate>() }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var hour by remember { mutableStateOf(12) }
     var minute by remember { mutableStateOf(0) }
-    var isAm by remember { mutableStateOf(true) }
+    var texto by remember { mutableStateOf("") }
+
+    val eventos by vm.eventos.collectAsState()
+    val scope = rememberCoroutineScope()
+    val tieneEvento: (LocalDate) -> Boolean = { d -> eventos.any { it.fecha == d } }
 
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
             .background(Color(0xFFE8F5E9))
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ── BOX SUPERIOR: flecha atrás alineada a la izquierda y logo centrado ──
-        Box(
+        // Logo más grande
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "Logo",
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp)
-                .height(64.dp),
-            contentAlignment = Alignment.Center
+                .size(60.dp)
+        )
+        // Top bar
+        Row(
+            Modifier.fillMaxWidth().height(64.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icono de flecha atrás alineado a la izquierda
-            Icon(
-                imageVector = Icons.Filled.ArrowBack,
-                contentDescription = "Volver a Home",
-                tint = Color.Black,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
+            Icon(Icons.Filled.ArrowBack, "back",
+                Modifier
                     .size(32.dp)
-                    .clickable { navController.navigate("home") }
-            )
-
-            // Logo centrado
-            Image(
-                painter = painterResource(id = R.drawable.logo),
-                contentDescription = "Logo",
-                modifier = Modifier
-                    .size(100.dp)
-            )
+                    .clickable { navController.navigate("home") })
+            Spacer(Modifier.weight(1f))
+            Text("Añadir Eventos",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2E7D32))
+            Spacer(Modifier.weight(1f))
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            "Calendario",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF2E7D32),
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // Navegación de mes
+        // Mes
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Mes anterior")
+            IconButton({ currentMonth = currentMonth.minusMonths(1) }) {
+                Icon(Icons.Filled.ArrowBack, null)
             }
             Text(
-                text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + currentMonth.year,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-                color = Color.Black,
+                "${currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${currentMonth.year}",
+                Modifier.weight(1f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
-            IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
-                Icon(Icons.Filled.ArrowForward, contentDescription = "Mes siguiente")
+            IconButton({ currentMonth = currentMonth.plusMonths(1) }) {
+                Icon(Icons.Filled.ArrowForward, null)
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
 
         // Días de la semana
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf("L", "M", "X", "J", "V", "S", "D").forEach {
-                Text(it, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+            listOf("L","M","X","J","V","S","D").forEach {
+                Text(it, fontWeight = FontWeight.Medium, color = Color.Gray)
             }
         }
+        Spacer(Modifier.height(4.dp))
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Construye la cuadrícula del mes
-        val firstDayOfMonth = currentMonth.atDay(1)
-        val startDow = firstDayOfMonth.dayOfWeek.value % 7  // lunes=1->1,...domingo=7->0
-        val totalDays = currentMonth.lengthOfMonth()
-        val weeks = ((startDow + totalDays + 6) / 7)
-
-        Column {
-            var dayCounter = 1 - startDow
-            repeat(weeks) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    repeat(7) {
-                        if (dayCounter in 1..totalDays) {
-                            val thisDate = currentMonth.atDay(dayCounter)
-                            val isCita = citas.contains(thisDate)
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(
-                                        color = when {
-                                            selectedDay == thisDate -> Color(0xFF90CAF9)
-                                            isCita -> Color(0xFF64B5F6)
-                                            else -> Color.White
-                                        },
-                                        shape = CircleShape
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (selectedDay == thisDate) Color(0xFF42A5F5) else Color.LightGray,
-                                        shape = CircleShape
-                                    )
-                                    .clickable {
-                                        selectedDay = thisDate
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = dayCounter.toString(),
-                                    color = if (isCita || selectedDay == thisDate) Color.White else Color.Black
+        // Cuadrícula
+        val firstDay = currentMonth.atDay(1)
+        val start = firstDay.dayOfWeek.value % 7
+        val days = currentMonth.lengthOfMonth()
+        val weeks = ((start + days + 6)/7)
+        var day = 1 - start
+        repeat(weeks) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
+                repeat(7) {
+                    if (day in 1..days) {
+                        val date = currentMonth.atDay(day)
+                        val marcado = tieneEvento(date)
+                        val seleccionado = selectedDay == date
+                        Box(
+                            Modifier.size(35.dp)
+                                .background(
+                                    when {
+                                        seleccionado -> Color(0xFF90CAF9)
+                                        marcado      -> Color(0xFF64B5F6)
+                                        else         -> Color.White
+                                    }, CircleShape
                                 )
-                            }
-                        } else {
-                            Spacer(Modifier.size(40.dp))
+                                .border(
+                                    1.dp,
+                                    if (seleccionado) Color(0xFF42A5F5) else Color.LightGray,
+                                    CircleShape
+                                )
+                                .clickable { selectedDay = date },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("$day",
+                                color = if (marcado || seleccionado) Color.White else Color.Black)
                         }
-                        dayCounter++
-                    }
+                    } else Spacer(Modifier.size(40.dp))
+                    day++
                 }
-                Spacer(Modifier.height(4.dp))
             }
+            Spacer(Modifier.height(4.dp))
         }
 
+        // Editor
         selectedDay?.let { fecha ->
+            LaunchedEffect(fecha) {
+                vm.get(fecha)?.let {
+                    hour = it.hora24; minute = it.minuto; texto = it.texto
+                } ?: run {
+                    hour = 12; minute = 0; texto = ""
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
             Column(
                 Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFD1C4E9), RoundedCornerShape(16.dp))
+                    .animateContentSize()
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    "Selecciona hora para el ${fecha.dayOfMonth}/${fecha.monthValue}/${fecha.year}",
-                    color = Color(0xFF512DA8),
-                    fontWeight = FontWeight.Medium
+                Icon(Icons.Filled.Delete,"borrar",
+                    Modifier
+                        .align(Alignment.End)
+                        .clickable {
+                            scope.launch { vm.delete(fecha) }
+                            Toast.makeText(ctx,"Evento eliminado", Toast.LENGTH_SHORT).show()
+                            selectedDay = null
+                        })
+
+                Text("Hora para ${fecha.dayOfMonth}/${fecha.monthValue}/${fecha.year}",
+                    fontWeight = FontWeight.Medium, color = Color(0xFF512DA8))
+
+                OutlinedTextField(
+                    value = texto,
+                    onValueChange = { texto = it },
+                    label = { Text("Descripción (ej. Tenis)", color= Color.White)},
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        containerColor = Color.Black,
+                        cursorColor = Color.White,
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.Black
+                    )
+
+
                 )
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Selector de hora
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     NumberPicker(
                         value = hour,
-                        range = 1..24,
+                        range = 0..23,
                         onValueChange = { hour = it },
                         textStyle = LocalTextStyle.current.copy(color = Color.Black, fontSize = 24.sp)
                     )
-                    Spacer(Modifier.width(8.dp))
                     Text(":", fontSize = 24.sp)
-                    Spacer(Modifier.width(8.dp))
-                    // Selector de minuto
                     NumberPicker(
                         value = minute,
                         range = 0..59,
                         onValueChange = { minute = it },
                         textStyle = LocalTextStyle.current.copy(color = Color.Black, fontSize = 24.sp)
                     )
-                    Spacer(Modifier.width(16.dp))
-                    // AM/PM toggle
-                    SegmentedButtonGroup(options = listOf("AM", "PM"), selected = if (isAm) 0 else 1) {
-                        isAm = (it == 0)
-                    }
                 }
-                Spacer(Modifier.height(12.dp))
-                Row {
-                    Button(
-                        onClick = { selectedDay = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("Cancel", color = Color.White)
-                    }
-                    Spacer(Modifier.width(24.dp))
-                    Button(
-                        onClick = {
-                            citas.add(fecha)
-                            selectedDay = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                    ) {
-                        Text("OK", color = Color.White)
-                    }
-                }
-            }
-        }
-    }
-}
 
-@Composable
-fun SegmentedButtonGroup(
-    options: List<String>,
-    selected: Int,
-    onSelect: (index: Int) -> Unit
-) {
-    Row {
-        options.forEachIndexed { idx, text ->
-            Box(
-                modifier = Modifier
-                    .background(
-                        if (idx == selected) Color(0xFF64B5F6) else Color.White,
-                        RoundedCornerShape(8.dp)
-                    )
-                    .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-                    .clickable { onSelect(idx) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(text, color = if (idx == selected) Color.White else Color.Black)
+                Spacer(Modifier.height(16.dp))
+
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                    Button(onClick={ selectedDay=null },
+                        colors=ButtonDefaults.buttonColors(containerColor=Color.Red)) {
+                        Text("Cancel", color=Color.White)
+                    }
+                    Button(onClick={
+                        if (Build.VERSION.SDK_INT>=33 &&
+                            ContextCompat.checkSelfPermission(
+                                ctx, Manifest.permission.POST_NOTIFICATIONS
+                            )!= PackageManager.PERMISSION_GRANTED) {
+                            permisoLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        scope.launch {
+                            vm.save(EventEntity(fecha,hour,minute,texto.ifBlank{"Entrenamiento"}))
+                        }
+                        Toast.makeText(ctx,"Evento guardado", Toast.LENGTH_SHORT).show()
+                        selectedDay = null
+                    }, colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF2E7D32))) {
+                        Text("OK", color=Color.White)
+                    }
+                }
             }
-            Spacer(Modifier.width(8.dp))
         }
     }
 }
